@@ -69,10 +69,10 @@ local EXTENSIONS_AUDIO_DEFAULT = Set {
     'ogm', 'opus', 'wav', 'wma'
 }
 
-local EXTENSIONS_IMAGES_DEFAULT = Set {
+ local EXTENSIONS_IMAGES_DEFAULT = Set {
     'avif', 'bmp', 'gif', 'j2k', 'jp2', 'jpeg', 'jpg', 'jxl', 'png',
     'svg', 'tga', 'tif', 'tiff', 'webp'
-}
+ }
 
 local EXTENSIONS, EXTENSIONS_VIDEO, EXTENSIONS_AUDIO, EXTENSIONS_IMAGES
 
