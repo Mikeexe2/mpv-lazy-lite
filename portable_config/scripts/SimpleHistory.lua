@@ -1,8 +1,8 @@
--- Copyright (c) 2025, Eisa AlAwadhi
+-- Copyright (c) 2022, Eisa AlAwadhi
 -- License: BSD 2-Clause License
 -- Creator: Eisa AlAwadhi
 -- Project: SimpleHistory
--- Version: 1.1.7
+-- Version: 1.1.6
 
 local o = {
 ---------------------------USER CUSTOMIZATION SETTINGS---------------------------
@@ -49,7 +49,7 @@ local o = {
 	date_format = '%A/%B %d/%m/%Y %X', --Date format in the log (see lua date formatting), e.g.:'%d/%m/%y %X' or '%d/%b/%y %X'
 	file_title_logging = 'protocols', --Change between 'all', 'protocols', 'none'. This option will store the media title in log file, it is useful for websites / protocols because title cannot be parsed from links alone
 	logging_protocols=[[
-	["https?://", "magnet:", "rtmp:"]
+	["://", "magnet:"]
 	]], --add above (after a comma) any protocol you want its title to be stored in the log file. This is valid only for (file_title_logging = 'protocols' or file_title_logging = 'all')
 	prefer_filename_over_title = 'local', --Prefers to log filename over filetitle. Select between 'local', 'protocols', 'all', and 'none'. 'local' prefer filenames for videos that are not protocols. 'protocols' will prefer filenames for protocols only. 'all' will prefer filename over filetitle for both protocols and not protocols videos. 'none' will always use filetitle instead of filename
 	same_entry_limit = 2, --Limit saving entries with same path: -1 for unlimited, 0 will always update entries of same path, e.g. value of 3 will have the limit of 3 then it will start updating old values on the 4th entry.
@@ -254,20 +254,36 @@ o.open_list_keybind = utils.parse_json(o.open_list_keybind)
 o.list_filter_jump_keybind = utils.parse_json(o.list_filter_jump_keybind)
 o.list_ignored_keybind = utils.parse_json(o.list_ignored_keybind)
 
+local is_windows = package.config:sub(1, 1) == "\\" -- detect path separator, windows uses backslashes
+
 if utils.shared_script_property_set then
-    utils.shared_script_property_set('simplehistory-menu-open', 'no')
+	utils.shared_script_property_set('simplehistory-menu-open', 'no')
 end
 mp.set_property('user-data/simplehistory/menu-open', 'no')
 
-if string.lower(o.log_path) == '/:dir%mpvconf%' then
-	o.log_path = mp.find_config_file('.')
-elseif string.lower(o.log_path) == '/:dir%script%' then
-	o.log_path = debug.getinfo(1).source:match('@?(.*/)')
-elseif o.log_path:match('/:var%%(.*)%%') then
+if o.log_path:match('^/:dir%%mpvconf%%') then
+	o.log_path = o.log_path:gsub('/:dir%%mpvconf%%', mp.find_config_file('.'))
+elseif o.log_path:match('^/:dir%%script%%') then
+	o.log_path = o.log_path:gsub('/:dir%%script%%', mp.find_config_file('scripts'))
+elseif o.log_path:match('^/:var%%(.*)%%') then
 	local os_variable = o.log_path:match('/:var%%(.*)%%')
 	o.log_path = o.log_path:gsub('/:var%%(.*)%%', os.getenv(os_variable))
 end
 local log_fullpath = utils.join_path(o.log_path, o.log_file)
+
+--create log_path if it doesn't exist
+local log_path = utils.split_path(log_fullpath)
+if utils.readdir(log_path) == nil then
+	local is_windows = package.config:sub(1, 1) == "\\"
+	local windows_args = { 'powershell', '-NoProfile', '-Command', 'mkdir', string.format("\"%s\"", log_path) }
+	local unix_args = { 'mkdir', '-p', log_path }
+	local args = is_windows and windows_args or unix_args
+	local res = mp.command_native({name = "subprocess", capture_stdout = true, playback_only = false, args = args})
+	if res.status ~= 0 then
+		msg.error("Failed to create log_path save directory "..log_path..". Error: "..(res.error or "unknown"))
+		return
+	end
+end
 
 local log_length_text = 'length='
 local log_time_text = 'time='
@@ -294,11 +310,12 @@ local seekTime = 0
 local logTime = 0 --1.3# use logTime since seekTime is used in multiple places
 local filterName = 'all'
 local sortName
+local normalize_path = nil
 
 function starts_protocol(tab, val)
-	for index, value in ipairs(tab) do
-		if (val:find(value) == 1) then
-			return true
+	for index, element in ipairs(tab) do
+		if string.find(val, element) then
+			 		return true
 		end
 	end
 	return false
@@ -381,9 +398,39 @@ function format_time(seconds, sep, decimals, style)
 	end
 end
 
+function normalize(path)
+    if normalize_path ~= nil then
+        if normalize_path then
+            path = mp.command_native({"normalize-path", path})
+        else
+            local directory = mp.get_property("working-directory", "")
+            path = utils.join_path(directory, path:gsub('^%.[\\/]',''))
+            if is_windows then path = path:gsub("\\", "/") end
+        end
+        return path
+    end
+
+    normalize_path = false
+
+    local commands = mp.get_property_native("command-list", {})
+    for _, command in ipairs(commands) do
+        if command.name == "normalize-path" then
+            normalize_path = true
+            break
+        end
+    end
+    return normalize(path)
+end
+
 function get_file()
+	function hex_to_char(x)
+		return string.char(tonumber(x, 16))
+	end
+
 	local path = mp.get_property('path')
 	if not path then return end
+	if path:match("bd://") or path:match("dvd://")  or path:match("dvb://") or path:match("cdda://") then return end
+	if not path:match('^%a[%a%d-_]+://') then path = normalize(path) end
 	
 	local length = (mp.get_property_number('duration') or 0)
 	
@@ -398,6 +445,7 @@ function get_file()
 		title = mp.get_property('filename'):gsub("\"", "")
 	end
 	
+	title = title:gsub('%%(%x%x)', hex_to_char)
 	return path, title, length
 end
 
@@ -433,10 +481,6 @@ end
 
 function esc_string(str)
 	return str:gsub("([%p])", "%%%1")
-end
-
-function esc_lua_pattern(str) --1.1.7# helper function to escape pattern
-    return str:gsub("([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1")
 end
 
 ---------Start of LogManager---------
@@ -486,9 +530,9 @@ function list_sort(tab, sort)
 		local function padnum(d) local dec, n = string.match(d, "(%.?)0*(.+)")
 			return #dec > 0 and ("%.12f"):format(d) or ("%s%03d%s"):format(dec, #n, n) end
 		if sort == 'alphanum-asc' then
-			table.sort(tab, function(a, b) return tostring(a['found_path']):gsub("%.?%d+", padnum) .. ("%3d"):format(#b) > tostring(b['found_path']):gsub("%.?%d+", padnum) .. ("%3d"):format(#a) end)
+			table.sort(tab, function(a, b) return tostring(a['found_path']):lower():gsub("%.?%d+", padnum) .. ("%3d"):format(#b) > tostring(b['found_path']):lower():gsub("%.?%d+", padnum) .. ("%3d"):format(#a) end)
 		elseif sort == 'alphanum-desc' then
-			table.sort(tab, function(a, b) return tostring(a['found_path']):gsub("%.?%d+", padnum) .. ("%3d"):format(#b) < tostring(b['found_path']):gsub("%.?%d+", padnum) .. ("%3d"):format(#a) end)
+			table.sort(tab, function(a, b) return tostring(a['found_path']):lower():gsub("%.?%d+", padnum) .. ("%3d"):format(#b) < tostring(b['found_path']):lower():gsub("%.?%d+", padnum) .. ("%3d"):format(#a) end)
 		end
 	end
 	
@@ -872,7 +916,12 @@ function draw_list()
 				osd_msg = osd_msg..osd_color..esc_string(o.text_highlight_pre_text)
 			end
 		end
-		
+
+		-- example in the mpv source suggests this escape method for set_osd_ass:
+		-- https://github.com/mpv-player/mpv/blob/94677723624fb84756e65c8f1377956667244bc9/player/lua/stats.lua#L145
+		p = p:gsub('\\', '\\\239\187\191')
+		   :gsub("{", "\\{")
+		   :gsub("^ ", "\\h")
 		osd_msg = osd_msg .. osd_color .. osd_key .. osd_index .. p
 		
 		if list_contents[#list_contents - i][osd_time_type] and tonumber(list_contents[#list_contents - i][osd_time_type]) > 0 then
@@ -1962,7 +2011,6 @@ end
 ---------End of LogManager---------
 
 function history_blacklist_check()
-	if o.history_blacklist == nil then msg.warn('ignoring history_blacklist option due to an inappropriate value') return false end --1.1.7# fix crash of history_blacklist if given
 	if not o.history_blacklist[1] or #o.history_blacklist == 1 and o.history_blacklist[1] == "" then return false end
 	local invertable_return = {true, false}
 	local blacklist_msg = 'File was not added to history because of blacklist'
@@ -1983,10 +2031,9 @@ function history_blacklist_check()
 		has_value(o.history_blacklist, "."..filePath:match('%.([^%.]+)$'), nil) then
 			msg.info(blacklist_msg)
 			return invertable_return[1]
-		else
-			for i=1, #o.history_blacklist do
-				local esc_history_blacklist = esc_lua_pattern(o.history_blacklist[i]) --1.1.7# add to fix not matching when special characters are found
-				if string.lower(filePath):match(string.lower(esc_history_blacklist)) and o.history_blacklist[i]:sub(-2) == '\\*' and string.lower(o.history_blacklist[i]:sub(1, -2)) ~= string.lower(filePath):match("(.*[\\/])") then
+		else --1.1.2# check to add any subfolder after /* to blacklist. issue #70
+			for i=1, #o.history_blacklist do --1.1.2# loop through blacklisted items, if the blacklist ends with * and it is a match after subbing of the current filePath then log it. #and additionally if it is the exact same path then ignore it.
+				if string.lower(filePath):match(string.lower(o.history_blacklist[i])) and o.history_blacklist[i]:sub(-1,#o.history_blacklist[i]) == '*' and string.lower(o.history_blacklist[i]:sub(1,-2)) ~= string.lower(filePath):match("(.*[\\/])") then
 					msg.info(blacklist_msg)
 					return invertable_return[1]
 				end
@@ -2224,7 +2271,7 @@ mp.register_event('file-loaded', function()
 	list_close_and_trash_collection()
 	filePath, fileTitle, fileLength = get_file()
 	loadTriggered = true --1.1.5# for resume and resume-notime startup behavior (so that it only triggers if started as idle and only once)
-	if (resume_selected == true and seekTime > 0) then
+	if (o.resume_option ~= 'none' and resume_selected == true and seekTime > 0) then
 		mp.commandv('seek', seekTime, 'absolute', 'exact')
 		resume_selected = false
 	end

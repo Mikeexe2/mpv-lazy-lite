@@ -19,8 +19,9 @@ function open_command_menu(data, opts)
 			---@diagnostic disable-next-line: deprecated
 			mp.commandv(unpack(itable_join({'script-message-to'}, menu.root.callback, {utils.format_json(event)})))
 		elseif event.type == 'activate' then
-			-- Modifiers and actions are not available on basic non-callback mode menus
-			if not event.modifiers and not event.action then
+			-- Modifiers and actions are not available on basic non-callback mode menus.
+			-- `alt` modifier should activate without closing the menu.
+			if (event.modifiers == 'alt' or not event.modifiers) and not event.action then
 				run_command(event.value)
 			end
 			-- Convention: Only pure item activations should close the menu.
@@ -96,13 +97,13 @@ function create_self_updating_menu_opener(opts)
 			actions[#actions + 1] = {
 				name = 'move_up',
 				icon = 'arrow_upward',
-				label = ulang._playlist_submenu_label1 .. ' (Ctrl+UP/PGUP/HOME)',
+				label = t('Move up') .. ' (ctrl+up/pgup/home)',
 				filter_hidden = true,
 			}
 			actions[#actions + 1] = {
 				name = 'move_down',
 				icon = 'arrow_downward',
-				label = ulang._playlist_submenu_label2 .. ' (Ctrl+DOWN/PGDWN/END)',
+				label = t('Move down') .. ' (ctrl+down/pgdwn/end)',
 				filter_hidden = true,
 			}
 		end
@@ -110,9 +111,9 @@ function create_self_updating_menu_opener(opts)
 			actions[#actions + 1] = {name = 'reload', icon = 'refresh', label = t('Reload') .. ' (f5)'}
 		end
 		if opts.on_remove or opts.on_delete then
-			local label = (opts.on_remove and ulang._playlist_submenu_label3 or ulang._playlist_submenu_label4) .. ' (DEL)'
+			local label = (opts.on_remove and t('Remove') or t('Delete')) .. ' (del)'
 			if opts.on_remove and opts.on_delete then
-				label = ulang._playlist_submenu_label3 .. ' (' .. t('%s ', 'DEL, ctrl+DEL') .. ')'
+				label = t('Remove') .. ' (' .. t('%s to delete', 'del, ctrl+del') .. ')'
 			end
 			actions[#actions + 1] = {name = 'remove', icon = 'delete', label = label}
 		end
@@ -212,13 +213,13 @@ function create_select_tracklist_type_menu_opener(opts)
 
 		if opts.load_command then
 			items[#items + 1] = {
-				title = ulang._submenu_import,
+				title = t('Load'),
 				bold = true,
 				italic = true,
-				hint = ulang._submenu_load_file,
+				hint = t('open file'),
 				value = '{load}',
 				actions = opts.download_command
-					and {{name = 'download', icon = 'language', label = ulang._dlsub_searchol}}
+					and {{name = 'download', icon = 'language', label = t('Search online')}}
 					or nil,
 			}
 		end
@@ -237,13 +238,13 @@ function create_select_tracklist_type_menu_opener(opts)
 
 		if snd then
 			local action = {
-				name = 'as_secondary', icon = snd.icon, label = ulang._sid_submenu_label1 .. ' (Shift+ENTER/MBTN_LEFT)',
+				name = 'as_secondary', icon = snd.icon, label = t('Use as secondary') .. ' (shift+enter/click)',
 			}
 			track_actions = {action}
 			table.insert(track_external_actions, action)
 		end
-		table.insert(track_external_actions, {name = 'reload', icon = 'refresh', label = ulang._sid_submenu_label2 .. ' (F5)'})
-		table.insert(track_external_actions, {name = 'remove', icon = 'delete', label = ulang._sid_submenu_label3 .. ' (DEL)'})
+		table.insert(track_external_actions, {name = 'reload', icon = 'refresh', label = t('Reload') .. ' (f5)'})
+		table.insert(track_external_actions, {name = 'remove', icon = 'delete', label = t('Remove') .. ' (del)'})
 
 		for _, track in ipairs(tracklist) do
 			if track.type == opts.type then
@@ -262,11 +263,13 @@ function create_select_tracklist_type_menu_opener(opts)
 				if track['demux-fps'] then h(string.format('%.5gfps', track['demux-fps'])) end
 				h(track.codec)
 				if track['audio-channels'] then
-					h(track['audio-channels'] .. ulang._submenu_id_hint)
+					h(track['audio-channels'] == 1
+						and t('%s channel', track['audio-channels'])
+						or t('%s channels', track['audio-channels']))
 				end
 				if track['demux-samplerate'] then h(string.format('%.3gkHz', track['demux-samplerate'] / 1000)) end
-				if track.forced then h(ulang._submenu_id_forced) end
-				if track.default then h(ulang._submenu_id_default) end
+				if track.forced then h(t('forced')) end
+				if track.default then h(t('default')) end
 				if track.external then
 					local extension = track.title:match('%.([^%.]+)$')
 					if track.title and escaped_filename and extension then
@@ -275,11 +278,11 @@ function create_select_tracklist_type_menu_opener(opts)
 							track.title = nil
 						end
 					end
-					h(ulang._submenu_id_external)
+					h(t('external'))
 				end
 
 				items[#items + 1] = {
-					title = (track.title and track.title or ulang._submenu_id_title .. track.id),
+					title = (track.title and track.title or t('Track %s', track.id)),
 					hint = table.concat(hint_values, ', '),
 					value = track.id,
 					active = track_selected or snd_selected,
@@ -313,18 +316,18 @@ function create_select_tracklist_type_menu_opener(opts)
 			if snd and (event.action == 'as_secondary' or event.modifiers == 'shift') then
 				local _, snd_track_index = get_props()
 				mp.commandv('set', snd.prop, event.value == snd_track_index and 'no' or event.value)
-				--if snd.enable_prop then -- 不合理
-					--mp.commandv('set', snd.enable_prop, 'yes')
-				--end
+				if snd.enable_prop then
+					mp.commandv('set', snd.enable_prop, 'yes')
+				end
 			elseif event.action == 'reload' then
 				reload(event.value)
 			elseif event.action == 'remove' then
 				remove(event.value)
 			elseif not event.modifiers or event.modifiers == 'alt' then
 				mp.commandv('set', opts.prop, event.value == get_props() and 'no' or event.value)
-				--if opts.enable_prop then
-					--mp.commandv('set', opts.enable_prop, 'yes')
-				--end
+				if opts.enable_prop then
+					mp.commandv('set', opts.enable_prop, 'yes')
+				end
 			end
 		end
 	end
@@ -342,7 +345,7 @@ function create_select_tracklist_type_menu_opener(opts)
 
 	return create_self_updating_menu_opener({
 		title = opts.title,
-		footnote = ulang._xid_submenu_footnote,
+		footnote = t('Toggle to disable.') .. ' ' .. t('Paste path or url to add.'),
 		type = opts.type,
 		list_prop = 'track-list',
 		serializer = serialize_tracklist,
@@ -391,11 +394,11 @@ function open_file_navigation_menu(directory_path, handle_activate, opts)
 			local items, selected_index = {}, 1
 
 			if process.status == 0 then
-				for drive in process.stdout:gmatch("(%a:)\\") do
+				for drive in process.stdout:gmatch('(%a:)\\') do
 					if drive then
 						local drive_path = normalize_path(drive)
 						items[#items + 1] = {
-							title = drive, hint = ulang._submenu_file_browser_item2_hint, value = drive_path, active = opts.active_path == drive_path,
+							title = drive, hint = t('drive'), value = drive_path, active = opts.active_path == drive_path,
 						}
 						if selected_path == drive_path then selected_index = #items end
 					end
@@ -430,10 +433,10 @@ function open_file_navigation_menu(directory_path, handle_activate, opts)
 
 		if is_root then
 			if state.platform == 'windows' then
-				items[#items + 1] = {title = '..', hint = ulang._submenu_file_browser_item_hint, value = '{drives}', separator = true, is_to_parent = true}
+				items[#items + 1] = {title = '..', hint = t('Drives'), value = '{drives}', separator = true, is_to_parent = true}
 			end
 		else
-			items[#items + 1] = {title = '..', hint = ulang._submenu_file_browser_item_hint2, value = serialized.dirname, separator = true, is_to_parent = true}
+			items[#items + 1] = {title = '..', hint = t('parent dir'), value = serialized.dirname, separator = true, is_to_parent = true}
 		end
 
 		back_path = items[#items] and items[#items].value
@@ -470,7 +473,7 @@ function open_file_navigation_menu(directory_path, handle_activate, opts)
 	local menu_data = {
 		type = opts.type,
 		title = opts.title or '',
-		footnote = ulang._import_id_footnote,
+		footnote = t('%s to go up in tree.', 'alt+up') .. ' ' .. t('Paste path or url to open.'),
 		items = {},
 		on_paste = 'callback',
 	}
@@ -480,13 +483,13 @@ function open_file_navigation_menu(directory_path, handle_activate, opts)
 		local items, selected_index, error = serialize_items(path, current_directory)
 		if error then
 			msg.error(error)
-			items = {{title = ulang._error, selectable = false, muted = true}}
+			items = {{title = 'Something went wrong. See console for errors.', selectable = false, muted = true}}
 		end
 
 		local title = opts.title
 		if not title then
 			if path == '{drives}' then
-				title = ulang._submenu_file_browser_title
+				title = 'Drives'
 			else
 				local serialized = serialize_path(path)
 				title = serialized and serialized.basename .. separator or '??'
@@ -663,7 +666,8 @@ do
 						-- If command is already in menu, just append the key to it
 						if key ~= '#' and command ~= '' and target_menu.items_by_command[command] then
 							local hint = target_menu.items_by_command[command].hint
-							target_menu.items_by_command[command].hint = hint and hint .. ', ' .. key or key
+							local key_human = keybind_to_human(key)
+							target_menu.items_by_command[command].hint = hint and hint .. ', ' .. key_human or key_human
 						else
 							-- Separator
 							if title_part:sub(1, 3) == '---' then
@@ -672,7 +676,7 @@ do
 							elseif command ~= 'ignore' then
 								local item = {
 									title = title_part,
-									hint = not is_dummy and key or nil,
+									hint = not is_dummy and keybind_to_human(key) or nil,
 									value = command,
 								}
 								if command == '' then
@@ -711,7 +715,7 @@ function get_keybinds_items()
 		local id = bind.key .. '<>' .. bind.cmd
 		if not ids[id] then
 			ids[id] = true
-			items[#items + 1] = {title = bind.cmd, hint = bind.key, value = bind.cmd}
+			items[#items + 1] = {title = bind.cmd, hint = keybind_to_human(bind.key) or bind.key, value = bind.cmd}
 		end
 	end
 
@@ -720,7 +724,7 @@ function get_keybinds_items()
 
 	return #items > 0 and items or {
 		{
-			title = ulang._input_empty,
+			title = t('%s are empty', '`input-bindings`'),
 			selectable = false,
 			align = 'center',
 			italic = true,
@@ -745,7 +749,7 @@ function open_stream_quality_menu()
 		items[#items + 1] = {title = height .. 'p', value = format, active = format == ytdl_format}
 	end
 
-	menu = Menu:open({type = 'stream-quality', title = ulang._stream_quality_submenu_title, items = items}, function(event)
+	menu = Menu:open({type = 'stream-quality', title = t('Stream quality'), items = items}, function(event)
 		if event.type == 'activate' then
 			mp.set_property('ytdl-format', event.value)
 
@@ -818,7 +822,7 @@ function open_open_file_menu()
 				mp.commandv(command, event.value, 'append')
 				local serialized = serialize_path(event.value)
 				local filename = serialized and serialized.basename or event.value
-				mp.commandv('show-text', ulang._submenu_file_browser_label1 .. ': ' .. filename, 3000)
+				mp.commandv('show-text', t('Added to playlist') .. ': ' .. filename, 3000)
 			elseif itable_has({nil, 'ctrl', 'alt', 'alt+ctrl'}, event.modifiers) and itable_has({nil, 'force_open'}, event.action) then
 				mp.commandv(command, event.value)
 				if not event.alt then menu:close() end
@@ -829,11 +833,11 @@ function open_open_file_menu()
 			allowed_types = config.types.media,
 			active_path = active_file,
 			directory_actions = {
-				{name = 'add_to_playlist', icon = 'playlist_add', label = ulang._submenu_file_browser_label1 .. ' (Shift+ENTER/MBTN_LEFT)'},
-				{name = 'force_open', icon = 'play_circle_outline', label = ulang._submenu_file_browser_label2 .. ' (Ctrl+ENTER/MBTN_LEFT)'},
+				{name = 'add_to_playlist', icon = 'playlist_add', label = t('Add to playlist') .. ' (shift+enter/click)'},
+				{name = 'force_open', icon = 'play_circle_outline', label = t('Open in mpv') .. ' (ctrl+enter/click)'},
 			},
 			file_actions = {
-				{name = 'add_to_playlist', icon = 'playlist_add', label = ulang._submenu_file_browser_label1 .. ' (Shift+ENTER/MBTN_LEFT)'},
+				{name = 'add_to_playlist', icon = 'playlist_add', label = t('Add to playlist') .. ' (shift+enter/click)'},
 			},
 			keep_open = true,
 			on_close = function() mp.unregister_event(handle_file_loaded) end,
@@ -845,7 +849,6 @@ end
 ---@param opts {prop: 'sub'|'audio'|'video'; title: string; loaded_message: string; allowed_types: string[]}
 function create_track_loader_menu_opener(opts)
 	local menu_type = 'load-' .. opts.prop
-
 	return function()
 		if Menu:is_open(menu_type) then
 			Menu:close()
@@ -891,13 +894,13 @@ function open_subtitle_downloader()
 		return
 	end
 
-	local search_suggestion, file_path = '', nil
-	local destination_directory = mp.command_native({'expand-path', '~~/subtitles'})
+	local search_suggestion, file_path, destination_directory = '', nil, nil
 	local credentials = {'--api-key', config.open_subtitles_api_key, '--agent', config.open_subtitles_agent}
 
 	if state.path then
 		if is_protocol(state.path) then
-			if not is_protocol(state.title) then search_suggestion = state.title end
+			local title = mp.get_property_native('title')
+			if title and not is_protocol(title) then search_suggestion = title end
 		else
 			local serialized_path = serialize_path(state.path)
 			if serialized_path then
@@ -906,6 +909,12 @@ function open_subtitle_downloader()
 				destination_directory = serialized_path.dirname
 			end
 		end
+	end
+
+	local force_destination = options.subtitles_directory:sub(1, 1) == '!'
+	if force_destination or not destination_directory then
+		local subtitles_directory = options.subtitles_directory:sub(force_destination and 2 or 1)
+		destination_directory = mp.command_native({'expand-path', subtitles_directory})
 	end
 
 	local handle_download, handle_search
@@ -920,14 +929,14 @@ function open_subtitle_downloader()
 		if error or not data or (not check_is_valid or not check_is_valid(data)) then
 			menu:update_items({
 				{
-					title = ulang._dlsub_err,
+					title = t('Something went wrong.'),
 					align = 'center',
 					muted = true,
 					italic = true,
 					selectable = false,
 				},
 				{
-					title = ulang._dlsub_err2,
+					title = t('See console for details.'),
 					align = 'center',
 					muted = true,
 					italic = true,
@@ -970,20 +979,20 @@ function open_subtitle_downloader()
 
 			menu:update_items({
 				{
-					title = ulang._dlsub_fin,
+					title = t('Subtitles loaded & enabled'),
 					bold = true,
 					icon = 'check',
 					selectable = false,
 				},
 				{
-					title = t(ulang._dlsub_remain .. ' %s', data.remaining .. '/' .. data.total),
+					title = t('Remaining downloads today: %s', data.remaining .. '/' .. data.total),
 					italic = true,
 					muted = true,
 					icon = 'file_download',
 					selectable = false,
 				},
 				{
-					title = t(ulang._dlsub_reset .. ' %s', data.reset_time),
+					title = t('Resets in: %s', data.reset_time),
 					italic = true,
 					muted = true,
 					icon = 'schedule',
@@ -1003,7 +1012,7 @@ function open_subtitle_downloader()
 
 		local args = itable_join({'search-subtitles'}, credentials)
 
-		local languages = get_languages() -- 上游的原始函数无效 --itable_filter(get_languages(), function(lang) return lang:match('.json$') == nil end)
+		local languages = itable_filter(get_languages(), function(lang) return lang:match('.json$') == nil end)
 		args[#args + 1] = '--languages'
 		args[#args + 1] = table.concat(table_keys(create_set(languages)), ',') -- deduplicates stuff like `en,eng,en`
 
@@ -1035,8 +1044,8 @@ function open_subtitle_downloader()
 			end)
 			local items = itable_map(subs, function(sub)
 				local hints = {sub.attributes.language}
-				if sub.attributes.foreign_parts_only then hints[#hints + 1] = ulang._dlsub_foreign end
-				if sub.attributes.hearing_impaired then hints[#hints + 1] = ulang._dlsub_hearing end
+				if sub.attributes.foreign_parts_only then hints[#hints + 1] = t('foreign parts only') end
+				if sub.attributes.hearing_impaired then hints[#hints + 1] = t('hearing impaired') end
 				local url = sub.attributes.url
 				return {
 					title = sub.attributes.release,
@@ -1044,19 +1053,19 @@ function open_subtitle_downloader()
 					value = {kind = 'file', id = sub.attributes.files[1].file_id, url = url},
 					keep_open = true,
 					actions = url and
-						{{name = 'open_in_browser', icon = 'open_in_new', label = ulang._dlsub_searchol_label}},
+						{{name = 'open_in_browser', icon = 'open_in_new', label = t('Open in browser') .. ' (shift)'}},
 				}
 			end)
 
 			if #items == 0 then
 				items = {
-					{title = ulang._dlsub_result0, align = 'center', muted = true, italic = true, selectable = false},
+					{title = t('no results'), align = 'center', muted = true, italic = true, selectable = false},
 				}
 			end
 
 			if data.page > 1 then
 				items[#items + 1] = {
-					title = ulang._dlsub_page_prev,
+					title = t('Previous page'),
 					align = 'center',
 					bold = true,
 					italic = true,
@@ -1068,7 +1077,7 @@ function open_subtitle_downloader()
 
 			if data.page < data.total_pages then
 				items[#items + 1] = {
-					title = ulang._dlsub_page_next,
+					title = t('Next page'),
 					align = 'center',
 					bold = true,
 					italic = true,
@@ -1083,18 +1092,19 @@ function open_subtitle_downloader()
 	end
 
 	local initial_items = {
-		{title = ulang._dlsub_2search, align = 'center', muted = true, italic = true, selectable = false},
+		{title = t('%s to search', 'enter'), align = 'center', muted = true, italic = true, selectable = false},
 	}
 
 	menu = Menu:open(
 		{
 			type = menu_type,
-			title = ulang._dlsub_enter_query,
+			title = t('enter query'),
 			items = initial_items,
 			search_style = 'palette',
 			on_search = 'callback',
 			search_debounce = 'submit',
 			search_suggestion = search_suggestion,
+			search_submit = search_suggestion and #search_suggestion > 0,
 		},
 		function(event)
 			if event.type == 'activate' then

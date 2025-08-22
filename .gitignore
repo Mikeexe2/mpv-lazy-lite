@@ -1,5 +1,6 @@
 mpv.exe
 mpv.com
+portable_config/mpv_reference.conf
 portable_config/files/screen/
 portable_config/files/_cache/shader/
 portable_config/files/watch_later/

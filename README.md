@@ -14,7 +14,7 @@ However, if you prefer to use MPV with its full set of features, including all b
 
 3. Replace the existing `.exe` file in your current installation directory with the new one.
 
-This process will ensure you're always running the latest version with any improvements or bug fixes.
+OR run the updater.bat file to get the newest version.
 
 ### Using the `portable_config` Folder
 
@@ -32,7 +32,7 @@ If you wish to use the same font like me, especially for displaying CJK (Chinese
 #### 2. **Noto Serif CJK**
    - **Font file:** [NotoSerifCJK-Bold.ttc](https://github.com/dyphire/mpv-config/raw/refs/heads/master/fonts/NotoSerifCJK-Bold.ttc)
    
-- Alternatively, you can change it in the `mpv.config` so that you can use the font you like.
+- Alternatively, you can change it in the `mpv.config` so that you can use the font you like. You can also put the font file inside the portable_config/fonts folder.
 
 ### Features of This Lite Version:
 

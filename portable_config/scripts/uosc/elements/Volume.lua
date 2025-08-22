@@ -215,6 +215,7 @@ function Volume:destroy()
 end
 
 function Volume:get_visibility()
+	if not state.is_idle and not state.has_audio then return 0 end
 	return self.slider.pressed and 1 or Elements:maybe('timeline', 'get_is_hovered') and -1
 		or Element.get_visibility(self)
 end
@@ -256,7 +257,7 @@ function Volume:render()
 
 	-- Mute button
 	local mute_rect = {ax = self.ax, ay = self.mute_ay, bx = self.bx, by = self.by}
-	cursor:zone('primary_click', mute_rect, function() mp.commandv('cycle', 'mute') end)
+	cursor:zone('primary_down', mute_rect, function() mp.commandv('cycle', 'mute') end)
 	local ass = assdraw.ass_new()
 	local width_half = (mute_rect.bx - mute_rect.ax) / 2
 	local height_half = (mute_rect.by - mute_rect.ay) / 2
@@ -264,16 +265,12 @@ function Volume:render()
 	local icon_name, horizontal_shift = 'volume_up', 0
 	if state.mute then
 		icon_name = 'volume_off'
-	elseif state.volume < 50 then
+	elseif state.volume <= 0 then
 		icon_name, horizontal_shift = 'volume_mute', height_half * 0.25
-	elseif state.volume < 80 then
+	elseif state.volume <= 60 then
 		icon_name, horizontal_shift = 'volume_down', height_half * 0.125
-	elseif state.volume > 100 and state.volume <= 125 then
-		icon_name, horizontal_shift = 'noise_aware', 0
-	elseif state.volume > 125 then
-		icon_name, horizontal_shift = 'noise_control_off', 0
 	end
-	local underlay_opacity = {main = visibility * 0.2, border = visibility * 0.5}
+	local underlay_opacity = {main = visibility * 0.3, border = visibility}
 	ass:icon(mute_rect.ax + width_half, mute_rect.ay + height_half, icon_size, 'volume_up',
 		{border = options.text_border * state.scale, opacity = underlay_opacity, align = 5}
 	)

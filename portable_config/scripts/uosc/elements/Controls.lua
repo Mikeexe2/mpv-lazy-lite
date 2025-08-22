@@ -12,7 +12,7 @@ local Speed = require('elements/Speed')
 -- scale - `options.controls_size` scale factor.
 -- ratio - Width/height ratio of a static or dynamic element.
 -- ratio_min Min ratio for 'dynamic' sized element.
----@alias ControlItem {element?: Element; kind: string; sizing: 'space' | 'static' | 'dynamic' | 'gap'; scale: number; ratio?: number; ratio_min?: number; hide: boolean; dispositions?: table<string, boolean>}
+---@alias ControlItem {element?: Element; kind: string; sizing: 'space' | 'static' | 'dynamic' | 'gap'; scale: number; ratio?: number; ratio_min?: number; hide: boolean; dispositions?: {[string]: boolean}[]}
 
 ---@class Controls : Element
 local Controls = class(Element)
@@ -36,43 +36,27 @@ end
 function Controls:init_options()
 	-- Serialize control elements
 	local shorthands = {
-		menu               = 'command:menu:script-binding uosc/menu-blurred?' .. ulang._button01,
-		subtitles          = 'command:subtitles:script-binding uosc/subtitles#sub>0?' .. ulang._button02,
-		audio              = 'command:graphic_eq:script-binding uosc/audio#audio>1?' .. ulang._button03,
-		['audio-device']   = 'command:speaker:script-binding uosc/audio-device?' .. ulang._button04,
-		video              = 'command:theaters:script-binding uosc/video#video>1?' .. ulang._button05,
-		playlist           = 'command:list_alt:script-binding uosc/playlist?' .. ulang._button06,
-		chapters           = 'command:bookmark:script-binding uosc/chapters#chapters>0?' .. ulang._button07,
-		editions           = 'command:bookmarks:script-binding uosc/editions#editions>1?' .. ulang._button08,
-		['stream-quality'] = 'command:high_quality:script-binding uosc/stream-quality?' .. ulang._button09,
-		['open-file']      = 'command:file_open:script-binding uosc/open-file?' .. ulang._button10,
-		items              = 'command:list_alt:script-binding uosc/items?' .. ulang._button11,
-		prev               = 'command:arrow_back_ios:script-binding uosc/prev?' .. ulang._button12,
-		['next']           = 'command:arrow_forward_ios:script-binding uosc/next?' .. ulang._button13,
-		first              = 'command:first_page:script-binding uosc/first?' .. ulang._button14,
-		last               = 'command:last_page:script-binding uosc/last?' .. ulang._button15,
-		['loop-playlist']  = 'cycle:repeat:loop-playlist:no/inf!?' .. ulang._button16,
-		['loop-file']      = 'cycle:repeat_one:loop-file:no/inf!?' .. ulang._button17,
-		shuffle            = 'toggle:shuffle:shuffle?' .. ulang._button18,
-		autoload           = 'toggle:hdr_auto:autoload@uosc?' .. ulang._button19,
-		fullscreen         = 'cycle:crop_free:fullscreen:no/yes=fullscreen_exit!?' .. ulang._button20,
-
-		-- 自定义的捷径
-		['play_pause']     = 'cycle:not_started:pause:no=play_circle/yes=pause_circle?' .. ulang._button_ext01,
-		['pause_play']     = 'cycle:not_started:pause:no=pause_circle/yes=play_circle?' .. ulang._button_ext02,
-		['pl-prev']        = 'command:navigate_before:playlist-prev?' .. ulang._button_ext03,
-		['pl-next']        = 'command:navigate_next:playlist-next?' .. ulang._button_ext04,
-		border             = 'toggle:border_style:border?' .. ulang._button_ext05,
-		ontop              = 'cycle:move_up:ontop:no/yes!?' .. ulang._button_ext06,
-		hwdec              = 'cycle:developer_board_off:hwdec:no=developer_board_off/yes=memory/auto-copy=developer_board?' .. ulang._button_ext07,
-		unscaled           = 'cycle:fit_screen:video-unscaled:no/yes!?' .. ulang._button_ext08,
-		deband             = 'cycle:texture:deband:no/yes!?' .. ulang._button_ext09,
-		deint              = 'cycle:autofps_select:deinterlace:no=align_horizontal_center/yes=clear_all/auto=autofps_select?' .. ulang._button_ext10,
-		['shot-vid']       = 'command:screenshot:screenshot video?' .. ulang._button_ext11,
-
-		['ST-stats_tog']   = 'command:info_outline:script-binding display-stats-toggle?' .. ulang._button_ext12,
-		['ST-thumb_tog']   = 'command:panorama:script-binding thumb_toggle?' .. ulang._button_ext13,
-
+		['play-pause'] = 'cycle:pause:pause:no/yes=play_arrow?' .. t('Play/Pause'),
+		menu = 'command:menu:script-binding uosc/menu-blurred?' .. t('Menu'),
+		subtitles = 'command:subtitles:script-binding uosc/subtitles#sub>0?' .. t('Subtitles'),
+		audio = 'command:graphic_eq:script-binding uosc/audio#audio>1?' .. t('Audio'),
+		['audio-device'] = 'command:speaker:script-binding uosc/audio-device?' .. t('Audio device'),
+		video = 'command:theaters:script-binding uosc/video#video>1?' .. t('Video'),
+		playlist = 'command:list_alt:script-binding uosc/playlist?' .. t('Playlist'),
+		chapters = 'command:bookmark:script-binding uosc/chapters#chapters>0?' .. t('Chapters'),
+		['editions'] = 'command:bookmarks:script-binding uosc/editions#editions>1?' .. t('Editions'),
+		['stream-quality'] = 'command:high_quality:script-binding uosc/stream-quality?' .. t('Stream quality'),
+		['open-file'] = 'command:file_open:script-binding uosc/open-file?' .. t('Open file'),
+		['items'] = 'command:list_alt:script-binding uosc/items?' .. t('Playlist/Files'),
+		prev = 'command:arrow_back_ios:script-binding uosc/prev?' .. t('Previous'),
+		next = 'command:arrow_forward_ios:script-binding uosc/next?' .. t('Next'),
+		first = 'command:first_page:script-binding uosc/first?' .. t('First'),
+		last = 'command:last_page:script-binding uosc/last?' .. t('Last'),
+		['loop-playlist'] = 'cycle:repeat:loop-playlist:no/inf!?' .. t('Loop playlist'),
+		['loop-file'] = 'cycle:repeat_one:loop-file:no/inf!?' .. t('Loop file'),
+		shuffle = 'toggle:shuffle:shuffle?' .. t('Shuffle'),
+		autoload = 'toggle:hdr_auto:autoload@uosc?' .. t('Autoload'),
+		fullscreen = 'cycle:crop_free:fullscreen:no/yes=fullscreen_exit!?' .. t('Fullscreen'),
 	}
 
 	-- Parse out disposition/config pairs
@@ -109,15 +93,27 @@ function Controls:init_options()
 		local parts = split(config, ' *: *')
 		local kind, params = parts[1], itable_slice(parts, 2)
 
-		-- Serialize dispositions
+		-- Serialize dispositions into OR groups of AND conditions
+		---@type {[string]: boolean}[]
 		local dispositions = {}
-		for _, definition in ipairs(comma_split(item.disposition)) do
-			if #definition > 0 then
-				local value = definition:sub(1, 1) ~= '!'
-				local name = not value and definition:sub(2) or definition
-				local prop = name:sub(1, 4) == 'has_' and name or 'is_' .. name
-				dispositions[prop] = value
+		---@type string[]
+		local disposition_props = {}
+		for _, or_group in ipairs(comma_split(item.disposition)) do
+			local group = {}
+			for _, condition in ipairs(split(or_group, ' *+ *')) do
+				if #condition > 0 then
+					local value = condition:sub(1, 1) ~= '!'
+					local name = not value and condition:sub(2) or condition
+					if name:sub(1, 4) == 'has_' or itable_has({'idle', 'image', 'audio', 'video', 'stream'}, name) then
+						local prop = name:sub(1, 4) == 'has_' and name or 'is_' .. name
+						group[prop] = value
+					else
+						disposition_props[#disposition_props + 1] = name
+						group[name] = value
+					end
+				end
 			end
+			dispositions[#dispositions + 1] = group
 		end
 
 		-- Convert toggles into cycles
@@ -191,6 +187,7 @@ function Controls:init_options()
 					name = params[1],
 					render_order = self.render_order,
 					anchor_id = 'controls',
+					on_hide = function() self:reflow() end,
 				})
 				table_assign(control, {element = element, sizing = 'static', scale = 1, ratio = 1})
 			end
@@ -209,6 +206,11 @@ function Controls:init_options()
 			break
 		end
 
+		if control.element then
+			for _, prop in ipairs(disposition_props) do
+				control.element:observe_mp_property(prop, function() self:reflow() end)
+			end
+		end
 		self.controls[#self.controls + 1] = control
 	end
 
@@ -216,18 +218,39 @@ function Controls:init_options()
 end
 
 function Controls:reflow()
-	-- Populate the layout only with items that match current disposition
+	-- Populate the layout only with items that are not hidden and match current disposition
 	self.layout = {}
 	for _, control in ipairs(self.controls) do
-		local matches = true
-		for prop, value in pairs(control.dispositions) do
-			if state[prop] ~= value then
-				matches = false
+		local matches = false
+		local conditions_num = 0
+
+		-- Check against OR groups of AND conditions
+		for _, group in pairs(control.dispositions) do
+			local group_matches = true
+			for prop, value in pairs(group) do
+				conditions_num = conditions_num + 1
+				---@type boolean
+				local current_value
+				if prop:sub(1, 4) == 'has_' or prop:sub(1, 3) == 'is_' then
+					current_value = state[prop]
+				else
+					current_value = mp.get_property_bool(prop, false)
+				end
+				if current_value ~= value then
+					group_matches = false
+					break
+				end
+			end
+			if group_matches then
+				matches = true
 				break
 			end
 		end
-		if control.element then control.element.enabled = matches end
-		if matches then self.layout[#self.layout + 1] = control end
+
+		if conditions_num == 0 then matches = true end
+		local show = matches and (not control.element or control.element.hide ~= true)
+		if control.element then control.element.enabled = show end
+		if show then self.layout[#self.layout + 1] = control end
 	end
 
 	self:update_dimensions()
@@ -266,7 +289,7 @@ function Controls:register_badge_updater(badge, element)
 	if is_external_prop then
 		element['on_external_prop_' .. prop] = function(_, value) handler(prop, value) end
 	else
-		self:observe_mp_property(observable_name, handler)
+		element:observe_mp_property(observable_name, handler)
 	end
 end
 
